@@ -1,2 +1,1 @@
-# normalize
-Normalize microservice
+# Normalize micro-service

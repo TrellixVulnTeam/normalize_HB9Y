@@ -1,0 +1,46 @@
+# vim: set syntax=yaml:
+
+version: '3.6'
+
+services:
+
+  normalize:
+    
+    image: "opertusmundi/normalize:${VERSION}"
+    build:
+      context: .
+      args:
+        VERSION: "${VERSION}"
+
+    volumes:
+    - type: 'bind'
+      source: './logs'
+      target: '/var/local/normalize/logs'
+    - type: 'bind'
+      source: './data/secret_key'
+      target: '/var/local/normalize/secret_key'
+      read_only: true
+    - type: 'bind'
+      source: './data/normalize.sqlite'
+      target: '/var/local/normalize/normalize.sqlite'
+    - type: 'bind'
+      source: './output'
+      target: '/var/local/normalize/output'
+       
+    networks:
+    - 'opertusmundi_network'  
+
+    ports:
+    - '5000:5000'
+
+    environment:
+      OUTPUT_DIR: '/var/local/normalize/output'
+      FLASK_ENV: "${FLASK_ENV}"
+      FLASK_DEBUG: "${FLASK_DEBUG}"
+      LOGGING_ROOT_LEVEL: 'INFO'
+      PYTHONUNBUFFERED: 1
+
+networks:
+  opertusmundi_network: 
+    external: true
+
