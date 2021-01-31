@@ -26,6 +26,9 @@ services:
     - type: 'bind'
       source: './output'
       target: '/var/local/normalize/output'
+    - type: 'bind'
+      source: './temp'
+      target: '/tmp'
        
     networks:
     - 'opertusmundi_network'  

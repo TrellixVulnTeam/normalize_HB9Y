@@ -1,10 +1,12 @@
 FROM osgeo/gdal:ubuntu-full-3.1.0 as build-stage-1
 
 RUN apt-get update \
-    && apt-get install -y gcc make g++ python3-pip \
-    && pip3 install --upgrade pip \
+    && apt-get install -y gcc make g++ git python3-pip
+
+RUN pip3 install --upgrade pip \
     && pip3 install --prefix=/usr/local "pycld2==0.41"
 
+RUN pip3 install --prefix=/usr/local git+https://github.com/OpertusMundi/geovaex@v0.1.1
 
 FROM osgeo/gdal:ubuntu-full-3.1.0
 ARG VERSION
@@ -14,7 +16,7 @@ LABEL framework="flask"
 LABEL usage="normalize microservice for rasters and vectors"
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends sqlite python3-pip
+    && apt-get install -y --no-install-recommends sqlite python3-pip libicu-dev python3-icu
 
 ENV VERSION="${VERSION}"
 ENV PYTHON_VERSION="3.8"

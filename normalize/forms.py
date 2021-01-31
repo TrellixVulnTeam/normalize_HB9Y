@@ -5,9 +5,11 @@ from wtforms.validators import DataRequired, AnyOf, Optional
 
 class NormalizeForm(FlaskForm):
     resource = FileField('resource', validators=[DataRequired()])
-
-    resource_type = StringField('resource_type', validators=[DataRequired()])
-
+    resource_type = StringField('resource_type', validators=[DataRequired(),
+                                                             AnyOf(['csv', 'shp'],
+                                                                   "Permitted values for resource_type are csv or shp")])
+    csv_delimiter = StringField('csv_delimiter', validators=[Optional()])
+    crs = StringField('crs', validators=[Optional()])
     response = StringField('response',
                            validators=[Optional(),
                                        AnyOf(['prompt', 'deferred'],
@@ -27,7 +29,7 @@ class NormalizeForm(FlaskForm):
                                 min_entries=0, validators=[Optional()])
     transliteration_langs = FieldList(StringField('transliteration_langs', validators=[Optional()], default=[]),
                                       min_entries=0, validators=[Optional()])
-    transliteration_lang = StringField('transliteration_lang', validators=[DataRequired()], default='')
+    transliteration_lang = StringField('transliteration_lang', validators=[Optional()], default='')
     value_cleaning = FieldList(StringField('value_cleaning', validators=[Optional()], default=[]),
                                min_entries=0, validators=[Optional()])
     wkt_normalization = FieldList(StringField('wkt_normalization', validators=[Optional()], default=[]),

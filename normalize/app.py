@@ -1,33 +1,30 @@
-from typing import Union
 from datetime import datetime, timezone
 from apispec import APISpec
 from apispec_webframeworks.flask import FlaskPlugin
 from flask import Flask
-from flask import make_response, send_file, abort
+from flask import make_response, send_file
 from flask_executor import Executor
 from flask_cors import CORS
 from os import path, getenv, stat
 
-import geopandas as gpd
-import pandas as pd
-from shapely import wkt
 from werkzeug.utils import secure_filename
+import geovaex
 
 from . import db
 from .forms import NormalizeForm
 from .logging import getLoggers
 import json
 
-from .normalization_functions import transliteration, phone_normalization, special_character_normalization, \
-    alphabetical_normalization, case_normalization, date_normalization, value_cleaning, wkt_normalization, \
-    column_name_normalization
 from .utils import mkdir, get_tmp_dir, validate_form, create_ticket, save_to_temp, check_directory_writable, \
-    get_temp_dir, get_delimiter
+    get_temp_dir, get_geodataframe, normalize_gdf
+
+
+class OutputDirNotSet(Exception):
+    pass
 
 
 if getenv('OUTPUT_DIR') is None:
-    raise Exception('Environment variable OUTPUT_DIR is not set.')
-
+    raise OutputDirNotSet('Environment variable OUTPUT_DIR is not set.')
 
 # Logging
 mainLogger, accountLogger = getLoggers()
@@ -59,13 +56,13 @@ app.config.from_mapping(
 
 def executor_callback(future):
     """The callback function called when a job has completed."""
-    ticket, result, success, comment = future.result()
-    if result is not None:
+    ticket, gdf, success, comment = future.result()
+    if gdf is not None:
         rel_path = datetime.now().strftime("%y%m%d")
         rel_path = path.join(rel_path, ticket)
         mkdir(path.join(getenv('OUTPUT_DIR'), rel_path))
         filepath = path.join(getenv('OUTPUT_DIR'), rel_path, "output.csv")
-        result.to_file(filepath)
+        geovaex.io.export_csv(gdf, filepath)
     else:
         filepath = None
     with app.app_context():
@@ -80,6 +77,7 @@ def executor_callback(future):
         accountLogger(ticket=ticket, success=success, execution_start=time, execution_time=execution_time,
                       comment=comment, filesize=filesize)
         dbc.close()
+
 
 # Ensure the instance folder exists and initialize application, db and executor.
 mkdir(app.instance_path)
@@ -105,46 +103,10 @@ def enqueue(ticket: str, src_path: str, form: NormalizeForm) -> tuple:
     dbc.commit()
     dbc.close()
     try:
-        gdf: Union[pd.Dataframe, gpd.GeoDataFrame] = None
-        if form.resource_type.data == "csv":
-            df = pd.read_csv(src_path, delimiter=get_delimiter(src_path))
-            df['wkt'] = df['wkt'].apply(wkt.loads)
-            gdf = gpd.GeoDataFrame(df)
-        if form.date_normalization.data:
-            for column in form.date_normalization.data:
-                gdf[column] = gdf[column].apply(lambda x: date_normalization(x))
-        if form.phone_normalization.data:
-            for column in form.phone_normalization.data:
-                gdf[column] = gdf[column].apply(lambda x: phone_normalization(x))
-        if form.special_character_normalization.data:
-            for column in form.special_character_normalization.data:
-                gdf[column] = gdf[column].apply(lambda x: special_character_normalization(x))
-        if form.alphabetical_normalization.data:
-            for column in form.alphabetical_normalization.data:
-                gdf[column] = gdf[column].apply(lambda x: alphabetical_normalization(x))
-        if form.case_normalization.data:
-            for column in form.case_normalization.data:
-                gdf[column] = gdf[column].apply(lambda x: case_normalization(x))
-        if form.transliteration.data:
-            if form.transliteration_langs and form.transliteration_lang != '':
-                langs = form.transliteration_langs + [form.transliteration_lang]
-            elif form.transliteration_langs:
-                langs = form.transliteration_langs
-            elif form.transliteration_lang != '':
-                langs = form.transliteration_lang
-            else:
-                abort(400, 'You selected the transliteration option without specifing the sources language(s)')
-            for column in form.transliteration.data:
-                gdf[column] = gdf[column].apply(lambda x: transliteration(x, langs))
-        if form.value_cleaning.data:
-            for column in form.value_cleaning.data:
-                gdf[column] = gdf[column].apply(lambda x: value_cleaning(x))
-        if form.wkt_normalization.data:
-            for column in form.wkt_normalization.data:
-                gdf[column] = gdf[column].apply(lambda x: wkt_normalization(x))
-        if form.column_name_normalization.data:
-            gdf.columns = column_name_normalization(list(gdf.columns))
+        gdf = get_geodataframe(form, src_path)
+        gdf = normalize_gdf(form, gdf)
     except Exception as e:
+        mainLogger.error(f'Processing of ticket: {ticket} failed')
         return ticket, None, 0, str(e)
     else:
         return ticket, gdf, 1, None
@@ -214,64 +176,25 @@ def normalize():
     """Normalize"""
     form = NormalizeForm()
     validate_form(form, mainLogger)
-    print(form.response.data)
-    print(form.transliteration.data)
-    print(form.resource.data.filename)
     tmp_dir: str = get_tmp_dir("normalize")
     ticket: str = create_ticket()
     src_file_path: str = save_to_temp(form, tmp_dir, ticket)
     # Immediate results
+    gdf = get_geodataframe(form, src_file_path)
+
     if form.response.data == "prompt":
-        gdf: Union[pd.Dataframe, gpd.GeoDataFrame] = None
-        if form.resource_type.data == "csv":
-            df = pd.read_csv(src_file_path, delimiter=get_delimiter(src_file_path))
-            df['wkt'] = df['wkt'].apply(wkt.loads)
-            gdf = gpd.GeoDataFrame(df)
-        if form.date_normalization.data:
-            for column in form.date_normalization.data:
-                gdf[column] = gdf[column].apply(lambda x: date_normalization(x))
-        if form.phone_normalization.data:
-            for column in form.phone_normalization.data:
-                gdf[column] = gdf[column].apply(lambda x: phone_normalization(x))
-        if form.special_character_normalization.data:
-            for column in form.special_character_normalization.data:
-                gdf[column] = gdf[column].apply(lambda x: special_character_normalization(x))
-        if form.alphabetical_normalization.data:
-            for column in form.alphabetical_normalization.data:
-                gdf[column] = gdf[column].apply(lambda x: alphabetical_normalization(x))
-        if form.case_normalization.data:
-            for column in form.case_normalization.data:
-                gdf[column] = gdf[column].apply(lambda x: case_normalization(x))
-        if form.transliteration.data:
-            if form.transliteration_langs and form.transliteration_lang != '':
-                langs = form.transliteration_langs + [form.transliteration_lang]
-            elif form.transliteration_langs:
-                langs = form.transliteration_langs
-            elif form.transliteration_lang != '':
-                langs = form.transliteration_lang
-            else:
-                abort(400, 'You selected the transliteration option without specifing the sources language(s)')
-            for column in form.transliteration.data:
-                gdf[column] = gdf[column].apply(lambda x: transliteration(x, langs))
-        if form.value_cleaning.data:
-            for column in form.value_cleaning.data:
-                gdf[column] = gdf[column].apply(lambda x: value_cleaning(x))
-        if form.wkt_normalization.data:
-            for column in form.wkt_normalization.data:
-                gdf[column] = gdf[column].apply(lambda x: wkt_normalization(x))
-        if form.column_name_normalization.data:
-            gdf.columns = column_name_normalization(list(gdf.columns))
+        gdf = normalize_gdf(form, gdf)
         src_path = path.join(tmp_dir, 'src', ticket)
         mkdir(src_path)
         filename = secure_filename('output.csv')
-        src_file = path.join(src_path, filename)
-        gdf.to_csv(src_file)
-        file_content = open(src_file, 'rb')
-        return send_file(file_content, attachment_filename=path.basename(src_file), as_attachment=True,
+        output_file = path.join(src_path, filename)
+        geovaex.io.export_csv(gdf, output_file)
+        file_content = open(output_file, 'rb')
+        return send_file(file_content, attachment_filename=path.basename(output_file), as_attachment=True,
                          mimetype='application/tar+gzip')
     # Wait for results
     else:
-        enqueue.submit(ticket, src_file_path, file_type="netcdf")
+        enqueue.submit(ticket, src_file_path, form)
         response = {"ticket": ticket, "endpoint": f"/resource/{ticket}", "status": f"/status/{ticket}"}
         return make_response(response, 202)
 

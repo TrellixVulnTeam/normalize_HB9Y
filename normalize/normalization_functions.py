@@ -4,7 +4,6 @@ from typing import List, Union
 from nltk import word_tokenize
 from polyglot.text import Text
 from polyglot.downloader import downloader
-from shapely.geometry import Polygon, MultiPolygon
 from transliterate import translit, get_available_language_codes
 
 DATE_FORMATS: List[str] = ['%Y-%m-%d %H:%M:%S%Z', '%Y-%m-%d %H:%M:%S',
@@ -107,12 +106,6 @@ def value_cleaning(literal: str):
     output = re.sub('\\\\', '/', output)  # change // to \ for urls
     output = re.sub('[^a-zA-ZA-Za-zΑ-Ωα-ωίϊΐόάέύϋΰήώ0-9-._~:/?#@!$ &038;\'()*+,=]', '', output)  # remove invalid url characters
     return output
-
-
-def wkt_normalization(geom: Union[Polygon, MultiPolygon]):
-    if geom.is_valid:
-        return geom
-    return None
 
 
 def column_name_normalization(column_names: List[str], version: int = 2):
