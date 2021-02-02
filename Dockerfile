@@ -6,7 +6,7 @@ RUN apt-get update \
 RUN pip3 install --upgrade pip \
     && pip3 install --prefix=/usr/local "pycld2==0.41"
 
-RUN pip3 install --prefix=/usr/local git+https://github.com/OpertusMundi/geovaex@v0.1.1
+RUN pip3 install --prefix=/usr/local git+https://github.com/OpertusMundi/geovaex@v0.1.2
 
 FROM osgeo/gdal:ubuntu-full-3.1.0
 ARG VERSION
@@ -52,6 +52,8 @@ ENV FLASK_ENV="production" \
     SECRET_KEY_FILE="/var/local/normalize/secret_key" \
     TLS_CERTIFICATE="" \
     TLS_KEY=""
+
+ENV SHAPE_ENCODING="utf-8"
 
 USER flask
 CMD ["/usr/local/bin/docker-command.sh"]

@@ -6,7 +6,7 @@ RUN apt-get update \
 RUN pip3 install --upgrade pip \
     && pip3 install --prefix=/usr/local "pycld2==0.41"
 
-RUN pip3 install --prefix=/usr/local git+https://github.com/OpertusMundi/geovaex@v0.1.1
+RUN pip3 install --prefix=/usr/local git+https://github.com/OpertusMundi/geovaex@v0.1.2
 
 FROM osgeo/gdal:ubuntu-full-3.1.0
 ARG VERSION
@@ -32,6 +32,8 @@ ENV FLASK_APP="normalize" \
     FLASK_ENV="testing" \
     FLASK_DEBUG="false" \
     OUTPUT_DIR="./output"
+
+ENV SHAPE_ENCODING="utf-8"
 
 COPY run-nosetests.sh /
 RUN chmod a+x /run-nosetests.sh
