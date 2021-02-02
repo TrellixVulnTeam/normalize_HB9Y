@@ -76,8 +76,7 @@ def get_tmp_dir(namespace: str) -> str:
     return tempdir
 
 
-def save_to_temp(form: FlaskForm, tmp_dir: str, ticket: str) -> str:
-    src_path = path.join(tmp_dir, 'src', ticket)
+def save_to_temp(form: FlaskForm, src_path: str) -> str:
     mkdir(src_path)
     filename = secure_filename(form.resource.data.filename)
     src_file = path.join(src_path, filename)
@@ -103,6 +102,14 @@ def get_delimiter(ds_path: str) -> str:
         return str(s.sniff(first_line).delimiter)
 
 
+def make_zip(zip_name, path_to_zip):
+    zip_handle = zipfile.ZipFile(zip_name, 'w', zipfile.ZIP_DEFLATED)
+    os.chdir(path_to_zip)
+    for root, dirs, files in os.walk('.'):
+        for file in files:
+            zip_handle.write(os.path.join(root, file))
+
+
 def get_geodataframe(form: FlaskForm, src_file_path: str):
     try:
         if form.resource_type.data == "csv":
@@ -125,7 +132,7 @@ def get_geodataframe(form: FlaskForm, src_file_path: str):
             gdf = geovaex.open(file_name)
         else:
             gdf = None
-            abort(400, "Not supported file type")
+            abort(400, "Not supported file type, the supported ones are csv and shp")
     except TypeError:
         abort(400, "Error while reading the file")
     else:
@@ -213,3 +220,20 @@ def normalize_gdf(form, gdf):
     gdf = perform_wkt_normalization(form, gdf)
     gdf = perform_column_name_normalization(form, gdf)
     return gdf
+
+
+def store_gdf(gdf, resource_type, file_name, src_path) -> str:
+    mkdir(src_path)
+    if resource_type == "csv":
+        stored_path = os.path.join(src_path, file_name + '.csv')
+        gdf.export(stored_path)
+        return stored_path
+    elif resource_type == "shp":
+        output_dir = os.path.join(src_path, file_name)
+        mkdir(output_dir)
+        gdf.export(os.path.join(output_dir, file_name + '.shp'), driver="ESRI ShapeFile")
+        stored_path = os.path.join(output_dir + '.zip')
+        make_zip(stored_path, output_dir)
+        return stored_path
+    else:
+        abort(400, "Not supported file type, the supported ones are csv and shp")

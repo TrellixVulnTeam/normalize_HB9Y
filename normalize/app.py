@@ -7,16 +7,13 @@ from flask_executor import Executor
 from flask_cors import CORS
 from os import path, getenv, stat
 
-from werkzeug.utils import secure_filename
-import geovaex
-
 from . import db
 from .forms import NormalizeForm
 from .logging import getLoggers
 import json
 
 from .utils import mkdir, get_tmp_dir, validate_form, create_ticket, save_to_temp, check_directory_writable, \
-    get_temp_dir, get_geodataframe, normalize_gdf
+    get_temp_dir, get_geodataframe, normalize_gdf, store_gdf
 
 
 class OutputDirNotSet(Exception):
@@ -56,13 +53,13 @@ app.config.from_mapping(
 
 def executor_callback(future):
     """The callback function called when a job has completed."""
-    ticket, gdf, success, comment = future.result()
+    ticket, gdf, resource_type, file_name, success, comment = future.result()
     if gdf is not None:
         rel_path = datetime.now().strftime("%y%m%d")
         rel_path = path.join(rel_path, ticket)
-        mkdir(path.join(getenv('OUTPUT_DIR'), rel_path))
-        filepath = path.join(getenv('OUTPUT_DIR'), rel_path, "output.csv")
-        geovaex.io.export_csv(gdf, filepath)
+        output_path: str = path.join(getenv('OUTPUT_DIR'), rel_path)
+        mkdir(output_path)
+        filepath = store_gdf(gdf, resource_type, file_name, output_path)
     else:
         filepath = None
     with app.app_context():
@@ -105,11 +102,12 @@ def enqueue(ticket: str, src_path: str, form: NormalizeForm) -> tuple:
     try:
         gdf = get_geodataframe(form, src_path)
         gdf = normalize_gdf(form, gdf)
+        file_name = path.split(src_path)[1].split('.')[0] + '_normalized'
     except Exception as e:
         mainLogger.error(f'Processing of ticket: {ticket} failed')
-        return ticket, None, 0, str(e)
+        return ticket, None, None, None, 0, str(e)
     else:
-        return ticket, gdf, 1, None
+        return ticket, gdf, form.resource_type.data, file_name, 1, None
 
 
 @app.route("/")
@@ -178,20 +176,17 @@ def normalize():
     validate_form(form, mainLogger)
     tmp_dir: str = get_tmp_dir("normalize")
     ticket: str = create_ticket()
-    src_file_path: str = save_to_temp(form, tmp_dir, ticket)
-    # Immediate results
-    gdf = get_geodataframe(form, src_file_path)
+    src_path: str = path.join(tmp_dir, 'src', ticket)
+    src_file_path: str = save_to_temp(form, src_path)
 
+    # Immediate results
     if form.response.data == "prompt":
+        gdf = get_geodataframe(form, src_file_path)
         gdf = normalize_gdf(form, gdf)
-        src_path = path.join(tmp_dir, 'src', ticket)
-        mkdir(src_path)
-        filename = secure_filename('output.csv')
-        output_file = path.join(src_path, filename)
-        geovaex.io.export_csv(gdf, output_file)
+        file_name = path.split(src_file_path)[1].split('.')[0] + '_normalized'
+        output_file = store_gdf(gdf, form.resource_type.data, file_name, src_path)
         file_content = open(output_file, 'rb')
-        return send_file(file_content, attachment_filename=path.basename(output_file), as_attachment=True,
-                         mimetype='application/tar+gzip')
+        return send_file(file_content, attachment_filename=path.basename(output_file), as_attachment=True)
     # Wait for results
     else:
         enqueue.submit(ticket, src_file_path, form)
