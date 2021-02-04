@@ -86,6 +86,8 @@ def transliteration_slow(blob: str, target_lang: str = "la"):
 
 
 def transliteration(blob: str, source_langs: Union[List[str], str], target_lang: str = "la"):
+    if blob is None:
+        return None
     text: str = blob
     available_langs = get_available_language_codes()
     if isinstance(source_langs, str):
