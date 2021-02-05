@@ -137,7 +137,6 @@ def test_normalize_transliterate_csv_file_input_prompt():
         res = client.post(path_to_test, data=payload, content_type='multipart/form-data')
         assert res.status_code in [200, 202]
         # Test if it returns the expected fields
-        print(res.get_data(as_text=True))
         expected = ['Naos Agion Theodoron', 'Άgios Arsenios', 'Naos U. Th. Odigitrias']
         df = pd.read_csv(StringIO(res.get_data(as_text=True)), sep=",")
         assert list(reversed(list(df['name'])))[1:4] == expected
