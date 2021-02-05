@@ -35,6 +35,7 @@ COPY normalize /usr/local/normalize/normalize
 
 RUN cd /usr/local/normalize && pip3 install --prefix=/usr/local -r requirements.txt -r requirements-production.txt
 RUN cd /usr/local/normalize && python setup.py install --prefix=/usr/local
+RUN python -m nltk.downloader -d /usr/local/share/nltk_data punkt
 
 COPY wsgi.py docker-command.sh /usr/local/bin/
 RUN chmod a+x /usr/local/bin/wsgi.py /usr/local/bin/docker-command.sh

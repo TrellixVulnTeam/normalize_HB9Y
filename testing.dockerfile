@@ -22,11 +22,15 @@ ENV VERSION="${VERSION}"
 ENV PYTHON_VERSION="3.8"
 ENV PYTHONPATH="/usr/local/lib/python${PYTHON_VERSION}/site-packages"
 
+RUN groupadd flask \
+    && useradd -m -d /var/local/normalize -g flask flask
+
 COPY --from=build-stage-1 /usr/local/ /usr/local/
 
 RUN pip3 install --upgrade pip
 COPY requirements.txt requirements-testing.txt ./
 RUN pip3 install --prefix=/usr/local -r requirements.txt -r requirements-testing.txt
+RUN python -m nltk.downloader -d /usr/local/share/nltk_data punkt
 
 ENV FLASK_APP="normalize" \
     FLASK_ENV="testing" \
