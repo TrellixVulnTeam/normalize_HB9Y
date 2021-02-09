@@ -1,3 +1,5 @@
+# vim: set syntax=dockerfile:
+
 FROM osgeo/gdal:ubuntu-full-3.1.0 as build-stage-1
 
 RUN apt-get update \
@@ -35,7 +37,7 @@ COPY normalize /usr/local/normalize/normalize
 
 RUN cd /usr/local/normalize && pip3 install --prefix=/usr/local -r requirements.txt -r requirements-production.txt
 RUN cd /usr/local/normalize && python setup.py install --prefix=/usr/local
-RUN python -m nltk.downloader -d /usr/local/share/nltk_data punkt
+RUN python -c "import nltk; nltk.download('punkt', '/usr/local/share/nltk_data')"
 
 COPY wsgi.py docker-command.sh /usr/local/bin/
 RUN chmod a+x /usr/local/bin/wsgi.py /usr/local/bin/docker-command.sh
@@ -52,9 +54,8 @@ ENV FLASK_ENV="production" \
     OUTPUT_DIR="/var/local/normalize/output/" \
     SECRET_KEY_FILE="/var/local/normalize/secret_key" \
     TLS_CERTIFICATE="" \
-    TLS_KEY=""
-
-ENV SHAPE_ENCODING="utf-8"
+    TLS_KEY="" \
+    SHAPE_ENCODING="utf-8"
 
 USER flask
 CMD ["/usr/local/bin/docker-command.sh"]
