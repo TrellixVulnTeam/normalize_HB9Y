@@ -1,5 +1,7 @@
 # Normalize micro-service
 
+[![Build Status](https://ci.dev-1.opertusmundi.eu:9443/api/badges/OpertusMundi/normalize/status.svg?ref=refs/heads/main)](https://ci.dev-1.opertusmundi.eu:9443/OpertusMundi/normalize)
+
 ## Build and run as a container
 
 Copy `.env.example` to `.env` and configure if needed (e.g `FLASK_ENV` variable).
