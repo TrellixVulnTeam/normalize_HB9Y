@@ -35,6 +35,9 @@ services:
 - name: docker
   image: docker:19.03-dind
   privileged: true
+  command:
+  # add a pull-through proxy to cache images from registry-1.docker.io
+  - --registry-mirror=http://registry-mirror:5000
   volumes:
   - name: docker_socket
     path: /var/run
