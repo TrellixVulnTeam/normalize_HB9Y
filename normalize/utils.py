@@ -50,7 +50,26 @@ def uncompress_file(src_file: str) -> str:
         src_path = path.dirname(src_file)
         if tarfile.is_tarfile(src_file):
             with tarfile.open(src_file, 'r') as handle:
-                handle.extractall(src_path)
+                def is_within_directory(directory, target):
+                    
+                    abs_directory = os.path.abspath(directory)
+                    abs_target = os.path.abspath(target)
+                
+                    prefix = os.path.commonprefix([abs_directory, abs_target])
+                    
+                    return prefix == abs_directory
+                
+                def safe_extract(tar, path=".", members=None, *, numeric_owner=False):
+                
+                    for member in tar.getmembers():
+                        member_path = os.path.join(path, member.name)
+                        if not is_within_directory(path, member_path):
+                            raise Exception("Attempted Path Traversal in Tar File")
+                
+                    tar.extractall(path, members, numeric_owner=numeric_owner) 
+                    
+                
+                safe_extract(handle, src_path)
                 extracted_path = get_extracted_path(src_path)
                 return extracted_path
         elif zipfile.is_zipfile(src_file):
